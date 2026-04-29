@@ -22,10 +22,9 @@ prompts:
   - '{{audio_path}}'
 
 providers:
-  - id: whisper-large-v3-turbo
+  - id: 'http://127.0.0.1:8765/transcribe'
     label: 'Whisper large-v3-turbo (mlx)'
     config:
-      url: http://127.0.0.1:8765/transcribe
       method: POST
       headers:
         Content-Type: application/json
@@ -34,10 +33,10 @@ providers:
         vad_trim: true
       transformResponse: 'json.text'
 
-  - id: indic-conformer-ctc
+  - id: 'http://127.0.0.1:8765/transcribe-conformer#ctc'
     label: 'IndicConformer 600M (CTC)'
     config:
-      url: http://127.0.0.1:8765/transcribe-conformer
+      url: 'http://127.0.0.1:8765/transcribe-conformer'
       method: POST
       headers:
         Content-Type: application/json
@@ -47,10 +46,10 @@ providers:
         language: hi
       transformResponse: 'json.text'
 
-  - id: indic-conformer-rnnt
+  - id: 'http://127.0.0.1:8765/transcribe-conformer#rnnt'
     label: 'IndicConformer 600M (RNNT)'
     config:
-      url: http://127.0.0.1:8765/transcribe-conformer
+      url: 'http://127.0.0.1:8765/transcribe-conformer'
       method: POST
       headers:
         Content-Type: application/json
