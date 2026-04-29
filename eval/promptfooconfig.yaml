@@ -1,0 +1,81 @@
+# Promptfoo A/B: Hindi STT — Whisper large-v3-turbo vs IndicConformer 600M
+#
+# Run:  cd ../  &&  promptfoo eval -c eval/promptfooconfig.yaml
+# View: promptfoo view
+#
+# Pre-reqs:
+# 1. The persistent STT server is running (uvicorn prototype.stt_server:app
+#    --host 127.0.0.1 --port 8765). Start it from the project root.
+# 2. For the conformer provider to actually return text, the venv needs an
+#    HF_TOKEN with access to ai4bharat/indic-conformer-600m-multilingual.
+#    Until then the conformer endpoint returns 503 with a gate message and
+#    only the whisper column populates.
+#
+# Eval shape v0: side-by-side compare, no assertions. Read both transcripts
+# manually. v1 (planned) adds Python WER assertions against hand-transcribed
+# ground truth; reference structure is in tests[].vars.ground_truth (commented
+# out until references exist).
+
+description: 'Hindi STT A/B — Whisper large-v3-turbo vs IndicConformer 600M'
+
+prompts:
+  - '{{audio_path}}'
+
+providers:
+  - id: whisper-large-v3-turbo
+    label: 'Whisper large-v3-turbo (mlx)'
+    config:
+      url: http://127.0.0.1:8765/transcribe
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        path: '{{audio_path}}'
+        vad_trim: true
+      transformResponse: 'json.text'
+
+  - id: indic-conformer-ctc
+    label: 'IndicConformer 600M (CTC)'
+    config:
+      url: http://127.0.0.1:8765/transcribe-conformer
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        path: '{{audio_path}}'
+        decoder: ctc
+        language: hi
+      transformResponse: 'json.text'
+
+  - id: indic-conformer-rnnt
+    label: 'IndicConformer 600M (RNNT)'
+    config:
+      url: http://127.0.0.1:8765/transcribe-conformer
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        path: '{{audio_path}}'
+        decoder: rnnt
+        language: hi
+      transformResponse: 'json.text'
+
+tests:
+  - description: 'TG-001: short greeting "Bhai Sunn kaisa hai"'
+    vars:
+      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777478093345-AgADQRwAAuAkmVM.oga
+      # ground_truth: 'भाई सुन कैसा है'  # uncomment once verified
+
+  - description: 'TG-002: longer utterance, hallucinated middle in Whisper'
+    vars:
+      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777479556339-AgADQRwAAuAkmVM.oga
+      # ground_truth: '???'  # awaiting reference
+
+# Default assertions (apply to every test) — uncomment when ground_truth lands
+# defaultTest:
+#   assert:
+#     - type: python
+#       value: |
+#         from jiwer import wer
+#         ref = context['vars']['ground_truth']
+#         return {'pass': wer(ref, output) < 0.20, 'score': 1.0 - wer(ref, output)}

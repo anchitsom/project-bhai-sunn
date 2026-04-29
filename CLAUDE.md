@@ -1,7 +1,8 @@
 # Project Bhai Sunn
 
-**Status:** aspirational — design-stage, no code yet
+**Status:** aspirational — STT path benchmarked, brain services not yet packaged
 **Graduates to:** products (when v1 satellite + brain demo runs end to end)
+**Collaborators:** joint project between Anchit Som and Adamya Tripathi
 
 ## Purpose
 Hindi-first, fully open-source alternative to Alexa for Indian households. Edge satellites speak to a homelab brain. No cloud dependency in the core path.
@@ -19,14 +20,22 @@ Reasoning per [[platform-lock-in]] and [[vendor-lock-in]] in the wiki: defeating
 - **Protocol:** Wyoming (the same wire Home Assistant Voice uses). Decouples mic from brain; any Wyoming-speaking satellite plugs in.
 
 ## Status Tracker
-- 2026-04-29: project created. Vision and architecture drafted. No code yet. Wake-word training set not collected. Mac Studio brain services not running.
+- 2026-04-29: project created. Vision, architecture, bootstrap drafted.
+- 2026-04-29: Phase 0 STT smoke test running. mlx-whisper large-v3-turbo on Mac Studio: 540ms warm latency for a 2.1s Hindi utterance. Persistent FastAPI STT server live on 127.0.0.1:8765.
+- 2026-04-29: Hindi STT model survey (research/hindi-stt-models-2026-04-29.md). IndicConformer 600M selected as the A/B candidate against Whisper. indic-seamless rejected on CC BY-NC licence. Sarvam Saaras V3 / Gemini 3 Pro classed as oracle-only.
+- 2026-04-29: A/B harness in flight. IndicConformer integration blocked on HuggingFace gate; Promptfoo eval config and brain endpoint scaffolded for plug-in once the model is available.
 
 ## Key Files
 - `vision.md` — what this is, why it exists, against-Alexa positioning, Hindi-first wedge
 - `architecture.md` — edge-brain split, Wyoming protocol flow, RAM budget on both sides, Mermaid + ASCII diagrams
 - `README.md` — entry point
 - `bootstrap.md` — install steps for the brain (Mac Studio) and a Pi satellite, end to end
-- `prototype/test_pipeline.py` — minimal smoke test: record 5s, transcribe, ask LLM, speak reply
+- `prototype/test_pipeline.py` — minimal one-shot smoke test (record 5s, transcribe, ask LLM, speak reply)
+- `prototype/transcribe_voice_note.py` — A/B raw-vs-denoised offline transcription
+- `prototype/stt_server.py` — persistent FastAPI server: warm mlx-whisper, single-pass, ffmpeg-piped numpy, edge-silence trim. 540ms warm.
+- `research/hindi-stt-models-2026-04-29.md` — verified survey of Hindi ASR options (Whisper, IndicConformer, indic-seamless, Sarvam, Gemini, Chirp) with sources cited per claim
+- `research/stt-ab-test-conformer-vs-whisper.md` — full discussion of the A/B test design, Promptfoo wiring, interim findings
+- `eval/` — Promptfoo eval config for Whisper-vs-Conformer A/B
 
 ## Open Questions
 - Wake-word data collection: how many speakers, how many environments, synthetic data via Piper for augmentation
