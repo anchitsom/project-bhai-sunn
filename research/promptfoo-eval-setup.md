@@ -191,7 +191,7 @@ cp deploy/start.sh ~/services/bhai-sunn-stt/start.sh
 chmod +x ~/services/bhai-sunn-stt/start.sh
 
 # IMPORTANT: edit the path in start.sh to match your machine
-# It currently points to /Users/anchitsom/agent-brain/projects/experiments/project-bhai-sunn_asp
+# It currently points to /Users/anchitsom/agent-brain/projects/products/project-bhai-sunn
 # Change it to wherever you cloned the repo
 
 cp deploy/com.anchit.bhai-sunn-stt.plist ~/Library/LaunchAgents/

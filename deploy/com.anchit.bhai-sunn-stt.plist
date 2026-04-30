@@ -11,7 +11,7 @@
     <string>/Users/anchitsom/services/bhai-sunn-stt/start.sh</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/anchitsom/agent-brain/projects/experiments/project-bhai-sunn_asp</string>
+  <string>/Users/anchitsom/agent-brain/projects/products/project-bhai-sunn</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

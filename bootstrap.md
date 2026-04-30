@@ -28,7 +28,7 @@ Why: these are the three brain services; we want them resident before any test.
 PATH="/opt/homebrew/bin:$PATH"
 
 # Project-local venv with Python 3.13 (cf. memory feedback_python_version)
-cd /Users/anchitsom/agent-brain/projects/experiments/project-bhai-sunn_asp
+cd /Users/anchitsom/agent-brain/projects/products/project-bhai-sunn
 python3.13 -m venv .venv
 .venv/bin/pip install fastapi uvicorn transformers torch torchaudio onnxruntime onnx librosa soundfile
 
@@ -58,7 +58,7 @@ What: execute `prototype/test_pipeline.py`.
 Why: end-to-end check that audio in produces audio out, in Hindi, on this machine alone.
 
 ```bash
-cd ~/agent-brain/projects/experiments/project-bhai-sunn_asp
+cd ~/agent-brain/projects/products/project-bhai-sunn
 python prototype/test_pipeline.py
 ```
 

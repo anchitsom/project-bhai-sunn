@@ -1,7 +1,7 @@
 # Project Bhai Sunn
 
-**Status:** aspirational — STT path benchmarked, brain services not yet packaged
-**Graduates to:** products (when v1 satellite + brain demo runs end to end)
+**Status:** live — graduated to products on 2026-04-30. STT path benchmarked, IndicConformer 600M shipped under launchd, Promptfoo eval surface working. Wake-word, LLM, and TTS phases pending.
+**Path:** `projects/products/project-bhai-sunn` (gitignored at agent-brain root; this folder IS the public repo at github.com/anchitsom/project-bhai-sunn)
 **Collaborators:** joint project between Anchit Som and Adamya Tripathi
 
 ## Purpose
@@ -51,6 +51,7 @@ The behavioural rule for AI assistants in this repo: if a Telegram voice note ar
 - 2026-04-29: A/B harness in flight. IndicConformer integration blocked on HuggingFace gate; Promptfoo eval config and brain endpoint scaffolded for plug-in once the model is available.
 - 2026-04-29 (late): HF gate accepted. First A/B run on two Telegram voice notes. IndicConformer beats Whisper on aspiration ("भाई" vs Whisper's "बाई"), proper-noun recognition ("अदम्या" vs Whisper's hallucinated "अदम्यागी"), and latency (3x faster on the same Mac).
 - 2026-04-30: IndicConformer 600M (RNNT) promoted to default STT. Whisper decommissioned. Server now runs under launchd as `com.anchit.bhai-sunn-stt` on 127.0.0.1:8765, KeepAlive=true. Telegram voice notes auto-transcribe via this endpoint going forward.
+- 2026-04-30 (later): project graduated to products. Folder moved from `experiments/project-bhai-sunn_asp/` to `products/project-bhai-sunn/`. launchd plist + venv shebangs updated to the new path. Promptfoo eval rewired to `fixtures/audio/` relative paths. Collaborator runbook (`deploy/install.sh` per-user installer + `research/promptfoo-eval-setup.md`) shipped.
 
 ## Key Files
 - `vision.md` — what this is, why it exists, against-Alexa positioning, Hindi-first wedge
