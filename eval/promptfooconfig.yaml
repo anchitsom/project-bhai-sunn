@@ -1,7 +1,14 @@
 # Promptfoo eval: Hindi STT — IndicConformer 600M decoder comparison
 #
-# Run:  cd ../  &&  promptfoo eval -c eval/promptfooconfig.yaml
-# View: promptfoo view
+# Run from the project root, not from this directory:
+#   cd <project root>
+#   promptfoo eval -c eval/promptfooconfig.yaml
+#   promptfoo view
+#
+# Why from the project root: the audio paths in test cases are relative
+# (fixtures/audio/...). The STT server resolves them relative to its
+# working directory, which the launchd plist sets to the project root.
+# Promptfoo just passes the string through to the HTTP body.
 #
 # The launchd-managed STT server (com.anchit.bhai-sunn-stt) hosts the
 # /transcribe endpoint at 127.0.0.1:8765 and stays up across reboots,
@@ -51,12 +58,12 @@ providers:
 tests:
   - description: 'TG-001: short greeting "Bhai Sunn kaisa hai"'
     vars:
-      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777478093345-AgADQRwAAuAkmVM.oga
+      audio_path: fixtures/audio/tg-001-greeting.oga
       # ground_truth: 'भाई सुन कैसा है'  # uncomment once verified
 
   - description: 'TG-002: longer utterance with proper noun (Adamya)'
     vars:
-      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777479556339-AgADRBwAAuAkmVM.oga
+      audio_path: fixtures/audio/tg-002-adamya.oga
       # ground_truth: 'भाई सुन अदम्या की पैंट फट गई'  # tentative; awaiting reference
 
 # Default assertions — uncomment when ground_truth lands on every test

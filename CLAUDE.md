@@ -20,12 +20,29 @@ Reasoning per [[platform-lock-in]] and [[vendor-lock-in]] in the wiki: defeating
 - **Protocol:** Wyoming (the same wire Home Assistant Voice uses). Decouples mic from brain; any Wyoming-speaking satellite plugs in.
 
 ## Always-on STT Service
-- launchd plist: `~/Library/LaunchAgents/com.anchit.bhai-sunn-stt.plist`
-- Wrapper: `~/services/bhai-sunn-stt/start.sh`
+- launchd plist: `~/Library/LaunchAgents/com.anchit.bhai-sunn-stt.plist` (committed to repo at `deploy/`)
+- Wrapper: `~/services/bhai-sunn-stt/start.sh` (committed to repo at `deploy/`)
 - Logs: `~/services/bhai-sunn-stt/{stdout,stderr}.log`
-- Endpoint: `POST http://127.0.0.1:8765/transcribe` (localhost-only, registered in `system/services-and-ports.md`)
-- HF auth: persisted at `~/.cache/huggingface/token` (mode 600); the plist sets `HF_HOME` so the cached token is found without env-var passthrough
+- Endpoint: `POST http://127.0.0.1:8765/transcribe` (localhost-only, no auth)
+- Offline mode: plist sets `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1`. Once the model is cached the HF token can be rotated freely.
 - Manage: `launchctl kickstart -k gui/$(id -u)/com.anchit.bhai-sunn-stt`
+
+## Getting Started for Collaborators
+This repo is set up so a fresh clone on a fresh Apple Silicon Mac becomes a working STT server plus a Promptfoo eval surface in well under an hour. Two runbooks cover the install end-to-end:
+- `deploy/README.md` — the launchd service: dependencies, HF gate-acceptance, model pre-cache, plist install, verification
+- `research/promptfoo-eval-setup.md` — the eval: how Promptfoo connects to the server, how to run, how to add new test cases, how to flip from compare-mode to WER-mode once a labelled set exists
+
+For a one-screen rough order:
+1. Clone the repo, `python3.13 -m venv .venv`, install Python deps (see `deploy/README.md` Step 1)
+2. Accept the HF gate at the IndicConformer model page, generate a token, run `huggingface-cli login`
+3. Pre-cache the model with one `from_pretrained` call (~3.4 GB download, only once)
+4. Edit the path in `deploy/start.sh` to your local clone path, copy `start.sh` to `~/services/bhai-sunn-stt/`, copy the plist to `~/Library/LaunchAgents/`, `launchctl bootstrap`
+5. `npm install -g promptfoo` (rebuild better-sqlite3 if Apple Silicon / Node-version mismatch)
+6. From the project root, `promptfoo eval -c eval/promptfooconfig.yaml`, then `promptfoo view`
+
+Test fixtures live in `fixtures/audio/`. Drop `.oga` or `.wav` audio there with stable filenames and reference them from `eval/promptfooconfig.yaml` to add new comparison rows.
+
+The behavioural rule for AI assistants in this repo: if a Telegram voice note arrives, auto-transcribe via the running STT server and reply with the transcript. No need to ask each time. Saved as a global memory in `feedback_telegram_voice_auto_transcribe.md`.
 
 ## Status Tracker
 - 2026-04-29: project created. Vision, architecture, bootstrap drafted.
@@ -40,12 +57,18 @@ Reasoning per [[platform-lock-in]] and [[vendor-lock-in]] in the wiki: defeating
 - `architecture.md` — edge-brain split, Wyoming protocol flow, RAM budget on both sides, Mermaid + ASCII diagrams
 - `README.md` — entry point
 - `bootstrap.md` — install steps for the brain (Mac Studio) and a Pi satellite, end to end
-- `prototype/test_pipeline.py` — minimal one-shot smoke test (record 5s, transcribe, ask LLM, speak reply)
-- `prototype/transcribe_voice_note.py` — A/B raw-vs-denoised offline transcription
-- `prototype/stt_server.py` — persistent FastAPI server hosting IndicConformer 600M (RNNT default, CTC optional). ffmpeg-piped numpy, edge-silence trim, ~150-180ms warm STT.
-- `research/hindi-stt-models-2026-04-29.md` — verified survey of Hindi ASR options (Whisper, IndicConformer, indic-seamless, Sarvam, Gemini, Chirp) with sources cited per claim
-- `research/stt-ab-test-conformer-vs-whisper.md` — full discussion of the A/B test design, Promptfoo wiring, interim findings
-- `eval/` — Promptfoo eval config for Whisper-vs-Conformer A/B
+- `prototype/test_pipeline.py` — Phase-0 mlx-whisper smoke test (decommissioned; preserved for history)
+- `prototype/transcribe_voice_note.py` — Phase-0 raw-vs-denoised offline transcription (decommissioned; preserved for history)
+- `prototype/stt_server.py` — persistent FastAPI server hosting IndicConformer 600M (RNNT default, CTC optional). ffmpeg-piped numpy, edge-silence trim, ~150-180ms warm STT. **The canonical STT path.**
+- `deploy/` — launchd plist, wrapper script, install runbook
+- `eval/promptfooconfig.yaml` — Promptfoo eval: Conformer RNNT vs CTC, compare-mode v0
+- `fixtures/audio/` — test audio fixtures referenced by the eval (committed)
+- `research/hindi-stt-models-2026-04-29.md` — verified survey of Hindi ASR options
+- `research/stt-ab-test-conformer-vs-whisper.md` — full discussion of the A/B test design and interim findings
+- `research/ab-results-2026-04-29.md` — the actual A/B data (Conformer wins on aspiration, proper-noun, latency)
+- `research/decommission-mlx-whisper-2026-04-30.md` — formal decommission log
+- `research/primer-gguf-pytorch-ollama-mlx.md` — runtime-stack explainer (PyTorch, GGUF, Ollama, MLX)
+- `research/promptfoo-eval-setup.md` — how the Promptfoo eval is wired and how to extend it
 
 ## Open Questions
 - Wake-word data collection: how many speakers, how many environments, synthetic data via Piper for augmentation

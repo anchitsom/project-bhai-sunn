@@ -4,56 +4,83 @@ Reproducible deployment of the STT server as a macOS launchd agent. Tested on ma
 
 ## What's here
 
-- `com.anchit.bhai-sunn-stt.plist` — launchd manifest. Reads from `~/services/bhai-sunn-stt/start.sh`. Sets `PATH`, `HF_HOME`, `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`. KeepAlive=true.
-- `start.sh` — wrapper that cd's into the project, then exec's `uvicorn prototype.stt_server:app` from the project venv on `127.0.0.1:8765`.
+- `install.sh` — per-user installer. Generates a customised `start.sh` and plist for the current user (replaces the hard-coded paths in the canonical `start.sh` and `com.anchit.bhai-sunn-stt.plist` below). Run this rather than copying the canonical files when you set up on a new machine.
+- `start.sh` — canonical wrapper. Reference copy of what the install script generates. Hard-codes Anchit's project path; do not copy directly.
+- `com.anchit.bhai-sunn-stt.plist` — canonical launchd manifest. Reference copy. Same caveat.
 
-## Install
+## Install on a fresh machine
+
+### Step 1: prerequisites
+
+What: project venv set up, model cached locally.
+Why: the launchd service runs in offline mode, so the model must already be on disk before it boots. The installer checks for both and refuses to install if either is missing.
 
 ```bash
-# 1. Make sure the project venv is set up and the model is cached
-cd /Users/anchitsom/agent-brain/projects/experiments/project-bhai-sunn_asp
+cd <path to your clone of project-bhai-sunn>
+
+# Python venv
 python3.13 -m venv .venv
 .venv/bin/pip install fastapi uvicorn transformers torch torchaudio onnxruntime onnx librosa soundfile
 
-# 2. Authenticate to HuggingFace once and accept the IndicConformer gate at
-# https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
+# Accept the gate at https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
+# Generate a token at https://huggingface.co/settings/tokens
 .venv/bin/python -c "from huggingface_hub import login; login(token='hf_...')"
+chmod 600 ~/.cache/huggingface/token ~/.cache/huggingface/stored_tokens
 
-# 3. Pre-cache the model (first run downloads ~3.4 GB)
+# Pre-cache (~3.4 GB download, only once)
 .venv/bin/python -c "from transformers import AutoModel; AutoModel.from_pretrained('ai4bharat/indic-conformer-600m-multilingual', trust_remote_code=True)"
+```
 
-# 4. Install the wrapper script
-mkdir -p ~/services/bhai-sunn-stt
-cp deploy/start.sh ~/services/bhai-sunn-stt/start.sh
-chmod +x ~/services/bhai-sunn-stt/start.sh
+### Step 2: install the launchd service
 
-# 5. Install the launchd plist
-cp deploy/com.anchit.bhai-sunn-stt.plist ~/Library/LaunchAgents/
+What: customise paths and labels for the current user, install plist + wrapper, bootstrap.
+Why: the canonical files in this directory hard-code Anchit's home directory and label. The installer generates per-user copies.
 
-# 6. Bootstrap the service (loads + starts)
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.anchit.bhai-sunn-stt.plist
+```bash
+./deploy/install.sh
+```
 
-# 7. Verify
+The installer writes:
+- `~/services/bhai-sunn-stt/start.sh` — your wrapper (correct path baked in)
+- `~/Library/LaunchAgents/com.bhai-sunn.bhai-sunn-stt.plist` — your plist (correct paths and label)
+
+It then `launchctl bootstrap`s the service and prints verification + management commands.
+
+### Step 3: verify
+
+```bash
 curl -s http://127.0.0.1:8765/health
 ```
 
-Success: `{"warmed":true,"model":"ai4bharat/indic-conformer-600m-multilingual","default_decoder":"rnnt","default_language":"hi"}`.
+Success: `{"warmed":true,"model":"ai4bharat/indic-conformer-600m-multilingual","default_decoder":"rnnt","default_language":"hi"}`. First boot takes ~10-15 seconds while the model loads.
+
+### Step 4: smoke-test a transcription
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/transcribe \
+  -H 'Content-Type: application/json' \
+  -d '{"path": "fixtures/audio/tg-001-greeting.oga"}' | python3 -m json.tool
+```
+
+Success: `text: "भाई सुन कैसा है"`, `timings.stt` under 200ms.
 
 ## Manage
 
 ```bash
-# Restart (after editing start.sh, plist, or the server code)
-launchctl kickstart -k gui/$(id -u)/com.anchit.bhai-sunn-stt
+# Restart (after editing server code or the plist)
+launchctl kickstart -k gui/$(id -u)/com.bhai-sunn.bhai-sunn-stt
 
 # Stop
-launchctl bootout gui/$(id -u)/com.anchit.bhai-sunn-stt
+launchctl bootout gui/$(id -u)/com.bhai-sunn.bhai-sunn-stt
 
 # Inspect
-launchctl print gui/$(id -u)/com.anchit.bhai-sunn-stt | head
+launchctl print gui/$(id -u)/com.bhai-sunn.bhai-sunn-stt | head
 
 # Logs
 tail -f ~/services/bhai-sunn-stt/stderr.log
 ```
+
+(Anchit's existing install uses the older label `com.anchit.bhai-sunn-stt`; new installs from `install.sh` use `com.bhai-sunn.bhai-sunn-stt`. Substitute the right label in the commands above.)
 
 ## Token rotation
 
@@ -61,8 +88,8 @@ The service runs in offline mode (`HF_HUB_OFFLINE=1`), so the HuggingFace token 
 
 1. Revoke the old token at https://huggingface.co/settings/tokens
 2. (Optional) `rm ~/.cache/huggingface/token ~/.cache/huggingface/stored_tokens`
-3. The service is unaffected. A new token is only required to download a new model or update an existing one.
+3. The service is unaffected. A new token is only required to download a *new* model or update an existing one.
 
 ## Why localhost-only
 
-The service exposes no auth. The bind-host rule for the homelab is "0.0.0.0 only when the service has auth or is read-only". Pinning to `127.0.0.1` keeps the wire trusted-loopback. Registered in `system/services-and-ports.md` under Localhost-only.
+The service exposes no auth. The bind-host rule for the homelab is "0.0.0.0 only when the service has auth or is read-only". Pinning to `127.0.0.1` keeps the wire trusted-loopback. Anchit's local install is also registered in `<workspace>/system/services-and-ports.md` under Localhost-only.
