@@ -1,55 +1,31 @@
-# Promptfoo A/B: Hindi STT — Whisper large-v3-turbo vs IndicConformer 600M
+# Promptfoo eval: Hindi STT — IndicConformer 600M decoder comparison
 #
 # Run:  cd ../  &&  promptfoo eval -c eval/promptfooconfig.yaml
 # View: promptfoo view
 #
-# Pre-reqs:
-# 1. The persistent STT server is running (uvicorn prototype.stt_server:app
-#    --host 127.0.0.1 --port 8765). Start it from the project root.
-# 2. For the conformer provider to actually return text, the venv needs an
-#    HF_TOKEN with access to ai4bharat/indic-conformer-600m-multilingual.
-#    Until then the conformer endpoint returns 503 with a gate message and
-#    only the whisper column populates.
+# The launchd-managed STT server (com.anchit.bhai-sunn-stt) hosts the
+# /transcribe endpoint at 127.0.0.1:8765 and stays up across reboots,
+# so no warm-up step is needed before running this eval.
 #
-# Eval shape v0: side-by-side compare, no assertions. Read both transcripts
-# manually. v1 (planned) adds Python WER assertions against hand-transcribed
-# ground truth; reference structure is in tests[].vars.ground_truth (commented
-# out until references exist).
+# Eval shape v0: side-by-side compare, no assertions. Read both
+# transcripts manually. v1 (planned) adds Python WER assertions against
+# hand-transcribed ground truth on a 30+ utterance labelled set.
+#
+# Whisper provider was decommissioned 2026-04-30 after the A/B in
+# research/decommission-mlx-whisper-2026-04-30.md. If you need to
+# re-add it for a regression run, revert the relevant commits and
+# add a fourth provider entry pointing at the Whisper path.
 
-description: 'Hindi STT A/B — Whisper large-v3-turbo vs IndicConformer 600M'
+description: 'Hindi STT — IndicConformer 600M (RNNT vs CTC)'
 
 prompts:
   - '{{audio_path}}'
 
 providers:
-  - id: 'http://127.0.0.1:8765/transcribe'
-    label: 'Whisper large-v3-turbo (mlx)'
-    config:
-      method: POST
-      headers:
-        Content-Type: application/json
-      body:
-        path: '{{audio_path}}'
-        vad_trim: true
-      transformResponse: 'json.text'
-
-  - id: 'http://127.0.0.1:8765/transcribe-conformer#ctc'
-    label: 'IndicConformer 600M (CTC)'
-    config:
-      url: 'http://127.0.0.1:8765/transcribe-conformer'
-      method: POST
-      headers:
-        Content-Type: application/json
-      body:
-        path: '{{audio_path}}'
-        decoder: ctc
-        language: hi
-      transformResponse: 'json.text'
-
-  - id: 'http://127.0.0.1:8765/transcribe-conformer#rnnt'
+  - id: 'http://127.0.0.1:8765/transcribe#rnnt'
     label: 'IndicConformer 600M (RNNT)'
     config:
-      url: 'http://127.0.0.1:8765/transcribe-conformer'
+      url: 'http://127.0.0.1:8765/transcribe'
       method: POST
       headers:
         Content-Type: application/json
@@ -59,18 +35,31 @@ providers:
         language: hi
       transformResponse: 'json.text'
 
+  - id: 'http://127.0.0.1:8765/transcribe#ctc'
+    label: 'IndicConformer 600M (CTC)'
+    config:
+      url: 'http://127.0.0.1:8765/transcribe'
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        path: '{{audio_path}}'
+        decoder: ctc
+        language: hi
+      transformResponse: 'json.text'
+
 tests:
   - description: 'TG-001: short greeting "Bhai Sunn kaisa hai"'
     vars:
       audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777478093345-AgADQRwAAuAkmVM.oga
       # ground_truth: 'भाई सुन कैसा है'  # uncomment once verified
 
-  - description: 'TG-002: longer utterance, hallucinated middle in Whisper'
+  - description: 'TG-002: longer utterance with proper noun (Adamya)'
     vars:
-      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777479556339-AgADQRwAAuAkmVM.oga
-      # ground_truth: '???'  # awaiting reference
+      audio_path: /Users/anchitsom/.claude/channels/telegram/inbox/1777479556339-AgADRBwAAuAkmVM.oga
+      # ground_truth: 'भाई सुन अदम्या की पैंट फट गई'  # tentative; awaiting reference
 
-# Default assertions (apply to every test) — uncomment when ground_truth lands
+# Default assertions — uncomment when ground_truth lands on every test
 # defaultTest:
 #   assert:
 #     - type: python

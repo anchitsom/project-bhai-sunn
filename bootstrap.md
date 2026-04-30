@@ -1,10 +1,12 @@
 # Bootstrap: Bhai Sunn
 
-**Status:** v0.1, 2026-04-29
+**Status:** v0.2, 2026-04-30
 **Reads first:** architecture.md
-**Reads next:** prototype/test_pipeline.py
+**Reads next:** `research/decommission-mlx-whisper-2026-04-30.md` for the STT decision history
 
 This guide takes a fresh Mac Studio and a fresh Pi to a working Phase 1 voice loop. Phase 0 (single-script smoke test) is at the end and runs on the Mac Studio alone.
+
+**STT change, 2026-04-30:** the brain's STT is now AI4Bharat IndicConformer 600M (RNNT), not mlx-whisper. The Phase 0 install steps below have been updated. The Whisper-based earlier instructions are preserved in git history (commit 80145e3 on the public repo).
 
 ## Prerequisites
 
@@ -19,15 +21,21 @@ Goal: prove the full audio loop on the brain alone, no satellite. Records a 5-se
 
 ### Step 1: install brain dependencies
 
-What: install mlx-whisper, Piper TTS, and pull the LLM into Ollama.
+What: install IndicConformer 600M deps (transformers + torch + onnxruntime), Piper TTS, and pull the LLM into Ollama.
 Why: these are the three brain services; we want them resident before any test.
 
 ```bash
-# Use the Bash-tool-friendly PATH override; Homebrew binaries are not on Claude's default PATH
 PATH="/opt/homebrew/bin:$PATH"
 
-# mlx-whisper for Apple Silicon STT
-pip install mlx-whisper
+# Project-local venv with Python 3.13 (cf. memory feedback_python_version)
+cd /Users/anchitsom/agent-brain/projects/experiments/project-bhai-sunn_asp
+python3.13 -m venv .venv
+.venv/bin/pip install fastapi uvicorn transformers torch torchaudio onnxruntime onnx librosa soundfile
+
+# HuggingFace authentication for the gated IndicConformer repo:
+# 1. Visit https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual and accept the gate
+# 2. Generate a read token at https://huggingface.co/settings/tokens
+# 3. Persist it: huggingface-cli login (writes to ~/.cache/huggingface/token, mode 600)
 
 # Piper TTS via Homebrew (or pip if not available)
 brew install piper-tts || pip install piper-tts
@@ -42,7 +50,7 @@ curl -L -O https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/pra
 ollama pull gemma2:9b
 ```
 
-Success: `ollama list` shows `gemma2:9b`, the two Piper files exist, `python -c "import mlx_whisper"` returns no error.
+Success: `ollama list` shows `gemma2:9b`, the two Piper files exist, the venv imports `transformers` and `torch` cleanly, and the HF cache token file at `~/.cache/huggingface/token` is mode 600.
 
 ### Step 2: run the smoke test
 

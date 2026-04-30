@@ -30,14 +30,16 @@ Aspirational. Vision and architecture are written; no code yet, no hardware prov
 | Layer | Choice | Where it runs |
 |---|---|---|
 | Wake | micro-wake-word (custom "Bhai Sunn") | Satellite |
-| STT | mlx-whisper large-v3-turbo | Brain |
+| STT | AI4Bharat IndicConformer 600M (RNNT) | Brain |
 | LLM | Gemma 2 9B q4_K_M via Ollama | Brain |
 | TTS | Piper hi_IN-pratham-medium | Brain |
 | Wire | Wyoming protocol over LAN | Both |
 
+The STT choice was settled by an A/B against Whisper large-v3-turbo (see `research/ab-results-2026-04-29.md` and `research/decommission-mlx-whisper-2026-04-30.md`). IndicConformer wins on aspiration, proper nouns, and latency on the same Mac Studio. Eval surface for the project is Promptfoo (`eval/promptfooconfig.yaml`).
+
 ## Why split
 
-A monolithic Pi-only build fits in ~3 GB resident, but Hindi quality is materially better with bigger Whisper and bigger LLM, both of which the Mac Studio runs comfortably. The satellite is therefore deliberately thin (~300 MB resident) so any cheap device can fill the role.
+A monolithic Pi-only build fits in ~3 GB resident, but Hindi quality is materially better with a bigger ASR model (IndicConformer 600M) and a bigger LLM (Gemma 2 9B), both of which the Mac Studio runs comfortably. The satellite is therefore deliberately thin (~300 MB resident) so any cheap device can fill the role.
 
 ## Phased delivery
 

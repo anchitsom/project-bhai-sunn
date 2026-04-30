@@ -10,7 +10,7 @@ A Hindi-first voice assistant built as a *Wyoming protocol* (Home Assistant's op
 
 ## Why split, not monolith
 
-A single-board on-device build (Pi 5 8GB running everything) is feasible — the earlier RAM budget showed it fits in roughly 2.9 GB resident. But the brain side punches above its weight when the model gets bigger. Hindi quality is materially different between Whisper-small (~244M params) and Whisper-large-v3-turbo (~809M params), and between Gemma 2 2B and Gemma 2 9B. The Mac Studio runs the bigger models with headroom; the Pi cannot.
+A single-board on-device build (Pi 5 8GB running everything) is feasible — the earlier RAM budget showed it fits in roughly 2.9 GB resident. But the brain side punches above its weight when the ASR model is Indic-trained rather than general-multilingual. The 2026-04-29 A/B between IndicConformer 600M and Whisper large-v3-turbo (`research/ab-results-2026-04-29.md`) showed real Hindi-quality wins — aspirated consonants preserved, proper nouns recognised — alongside a 3x latency advantage. Same trade for the LLM: Gemma 2 9B beats Gemma 2 2B on Hindi response quality. The Mac Studio runs both bigger models with headroom; the Pi cannot.
 
 Splitting also lets the household scatter satellites cheaply. A 512MB Pi Zero 2 W or an ESP32 with the OpenHomeFoundation Voice firmware costs an order of magnitude less than a Pi 5, and once the brain is bigger, the satellite has nothing to gain from being beefier.
 
@@ -22,10 +22,10 @@ Splitting also lets the household scatter satellites cheaply. A 512MB Pi Zero 2 
 |  EDGE SATELLITE   |    Wyoming    |      HOMELAB BRAIN (Mac Studio)   |
 |  (Pi 5 / Pi Zero  |  (audio +     |                                   |
 |   / ESP32)        |   intents     |   +-----------+   +-----------+   |
-|                   |   over LAN)   |   | Wyoming   |   | mlx-      |   |
-|  +----------+     |  ===========> |   | gateway   |-->| whisper   |   |
-|  | mic      |     |               |   +-----------+   | large-v3- |   |
-|  +----------+     |               |        |          | turbo     |   |
+|                   |   over LAN)   |   | Wyoming   |   | Indic-    |   |
+|  +----------+     |  ===========> |   | gateway   |-->| Conformer |   |
+|  | mic      |     |               |   +-----------+   | 600M      |   |
+|  +----------+     |               |        |          | (RNNT)    |   |
 |       |           |               |        |          +-----------+   |
 |       v           |               |        v                |         |
 |  +----------+     |               |   +-----------+         |         |
@@ -58,7 +58,7 @@ flowchart LR
 
     subgraph Brain["Homelab brain (Mac Studio M1 Max)"]
         GW[Wyoming gateway]
-        STT[mlx-whisper\nlarge-v3-turbo]
+        STT[IndicConformer 600M\nRNNT decoder]
         LLM[Gemma 2 9B q4\nvia Ollama]
         TTS[Piper hi_IN-\npratham-medium]
         POLICY[household.md\npolicy + facts]
@@ -83,7 +83,7 @@ sequenceDiagram
     participant U as User
     participant M as Mic + wake (satellite)
     participant W as Wyoming gateway (brain)
-    participant S as mlx-whisper
+    participant S as IndicConformer-600M
     participant L as Gemma 2 9B
     participant T as Piper TTS
     participant Sp as Speaker (satellite)
@@ -119,12 +119,12 @@ The satellite fits in a 512 MB Pi Zero 2 W with comfortable headroom. A Pi 5 is 
 | Component | Resident RAM |
 |---|---|
 | Wyoming gateway service | ~100 MB |
-| mlx-whisper large-v3-turbo (loaded) | ~1.6 GB |
+| IndicConformer 600M (loaded, fp32) | ~2.4 GB |
 | Gemma 2 9B q4_K_M via Ollama | ~5.5 GB |
 | Piper hi_IN-pratham-medium | ~80 MB |
 | Inference peak (KV cache + audio buffers) | ~700 MB |
-| **Total resident at idle** | **~7.3 GB** |
-| **Peak under load** | **~8.0 GB** |
+| **Total resident at idle** | **~8.1 GB** |
+| **Peak under load** | **~8.8 GB** |
 
 Mac Studio already runs Ollama (qwen2.5:7b, ~6 GB) and pipeline-api / ingest-worker / n8n. Total fleet at peak still fits within 32 GB with multi-GB headroom.
 
@@ -143,14 +143,14 @@ Default: Gemma 2 9B q4_K_M. Falls back to Gemma 2 2B if the household runs the P
 
 ## Trade-off table: STT choice on Mac Studio
 
-| Engine | Throughput on M1 Max | Hindi WER (anec.) | Notes |
-|---|---|---|---|
-| faster-whisper small | 1.5x realtime (CPU) | ~22% | Per memory: faster-whisper is CPU-only on Mac and ~10x slower than mlx |
-| mlx-whisper small | ~10x realtime | ~22% | Uses Apple Neural Engine + GPU |
-| mlx-whisper large-v3-turbo | ~6x realtime | ~12% | **v1 default** |
-| mlx-whisper large-v3 | ~3x realtime | ~10% | Marginal quality gain, real latency penalty |
+| Engine | Decoder | Warm STT (M1 Max) | Hindi quality | Licence | Notes |
+|---|---|---|---|---|---|
+| Whisper large-v3-turbo (mlx) | autoregressive | 465-523ms | drops aspirated consonants (बाई for भाई); hallucinates proper nouns | MIT | **Decommissioned 2026-04-30.** Generalist multilingual; lost the A/B on Hindi quality and on latency. |
+| IndicConformer 600M | RNNT | 184ms | preserves aspiration; recognises Indic proper nouns | MIT | **v1 default.** Indic-trained on AI4Bharat IN-22 corpus. |
+| IndicConformer 600M | CTC | 128-150ms | similar to RNNT, occasionally drops nasals (पैट for पैंट) | MIT | Faster, streaming-friendly, ~75ms cheaper. Use when latency dominates quality. |
+| IndicSeamless 2B | seq2seq | not benchmarked | claims SOTA FLEURS-Hindi (translation, not pure ASR) | **CC BY-NC** | Rejected on licence; vision.md commits to fully open-source. |
 
-Default: mlx-whisper large-v3-turbo. The "turbo" variant is large-v3 with the decoder pruned for speed at minimal quality loss — a deliberate choice for an interactive assistant.
+Default: IndicConformer 600M with the RNNT decoder. The Conformer architecture is a pure-ASR design (hybrid CTC+RNNT in a single forward pass) trained by AI4Bharat on Indic data. The RNNT decoder is non-autoregressive in a way that pays off on Apple Silicon CPU even without MLX — see `research/ab-results-2026-04-29.md` for the head-to-head and `research/primer-gguf-pytorch-ollama-mlx.md` for why this was a counter-intuitive result.
 
 ## Trade-off table: TTS
 
@@ -198,7 +198,7 @@ Phases 0 to 2 are v1. Phases 3 and 4 are v2.
 - **Mac Studio host**: `projects/products/mac-studio-setup/` — already documents launchd services, Ollama, and the homelab service convention. Bhai Sunn brain services follow the same pattern.
 - **Wiki concepts grounding the design**: `wiki/concepts/platform-lock-in.md`, `wiki/concepts/vendor-lock-in.md`, `wiki/sources/platformland.md`.
 - **Earlier orchestrator-worker discipline**: `projects/experiments/local-llm_liv/` — same simplicity-first stance, no LangGraph.
-- **STT decision basis**: `~/.claude/projects/.../memory/feedback_mlx_whisper_apple_silicon.md` — the rule that on Apple Silicon, mlx-whisper beats faster-whisper by 10x.
+- **STT decision basis**: `research/ab-results-2026-04-29.md` — A/B run that promoted IndicConformer 600M (RNNT) over Whisper large-v3-turbo on aspiration, proper-noun recognition, and latency. The earlier MLX-vs-faster-whisper memory rule still holds for Whisper specifically; this project no longer uses Whisper.
 
 ## References
 
